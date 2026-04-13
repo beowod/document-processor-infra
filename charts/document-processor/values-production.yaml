@@ -1,0 +1,61 @@
+replicaCount: 4
+
+image:
+  tag: "stable"
+
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/document-processor-production"
+
+configMap:
+  logLevel: "warn"
+  s3BucketName: "document-processor-production-123456789012"
+  sqsQueueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/document-processor-production"
+  enableFeatureX: "false"
+
+# Probes adjusted for placeholder nginx image (no /healthz endpoint).
+probes:
+  liveness:
+    path: /
+    port: 8080
+  readiness:
+    path: /
+    port: 8080
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 101
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+podSecurityContext:
+  fsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+
+extraVolumeMounts:
+  - name: nginx-cache
+    mountPath: /var/cache/nginx
+  - name: nginx-run
+    mountPath: /var/run
+
+extraVolumes:
+  - name: nginx-cache
+    emptyDir: {}
+  - name: nginx-run
+    emptyDir: {}
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+autoscaling:
+  minReplicas: 4
+  maxReplicas: 10

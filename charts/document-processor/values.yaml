@@ -1,0 +1,98 @@
+replicaCount: 2
+
+# Placeholder image for assignment demonstration.
+# In production this would be the ECR-hosted document-processor image.
+image:
+  repository: docker.io/nginxinc/nginx-unprivileged
+  tag: "alpine"
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: ""
+  name: ""
+
+configMap:
+  logLevel: "info"
+  s3BucketName: ""
+  sqsQueueUrl: ""
+  awsRegion: "us-east-1"
+  enableFeatureX: "false"
+
+secrets:
+  create: true
+  dbConnectionString: ""
+  apiKey: ""
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  scaleDownStabilizationSeconds: 300
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+probes:
+  liveness:
+    path: /healthz
+    port: 8080
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    failureThreshold: 3
+  readiness:
+    path: /readyz
+    port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 3
+
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  path: /metrics
+  port: http-metrics
+
+prometheusRules:
+  enabled: true
+  errorRateThreshold: 5
+  errorRateDuration: 5m
+  queueDepthThreshold: 1000
+  queueDepthDuration: 10m
+  podRestartThreshold: 3
+  podRestartDuration: 15m
+
+containerPort: 8080
+metricsPort: 9090
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+podSecurityContext:
+  fsGroup: 65534
+  seccompProfile:
+    type: RuntimeDefault
+
+extraVolumeMounts: []
+extraVolumes: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,64 @@
+replicaCount: 2
+
+image:
+  tag: "alpine"
+
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/document-processor-staging"
+
+configMap:
+  logLevel: "debug"
+  s3BucketName: "document-processor-staging-123456789012"
+  sqsQueueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/document-processor-staging"
+  enableFeatureX: "true"
+
+# Probes adjusted for placeholder nginx image (no /healthz endpoint).
+# The real application would serve /healthz and /readyz natively.
+probes:
+  liveness:
+    path: /
+    port: 8080
+  readiness:
+    path: /
+    port: 8080
+
+# nginx-unprivileged requires writable cache/run dirs.
+# Not needed for the real application image.
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 101
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+podSecurityContext:
+  fsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+
+extraVolumeMounts:
+  - name: nginx-cache
+    mountPath: /var/cache/nginx
+  - name: nginx-run
+    mountPath: /var/run
+
+extraVolumes:
+  - name: nginx-cache
+    emptyDir: {}
+  - name: nginx-run
+    emptyDir: {}
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 5

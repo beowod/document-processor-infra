@@ -1,0 +1,46 @@
+{{- if .Values.prometheusRules.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "document-processor.fullname" . }}
+  labels:
+    {{- include "document-processor.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: {{ include "document-processor.fullname" . }}
+      rules:
+        - alert: DocumentProcessorHighErrorRate
+          expr: |
+            rate(http_requests_total{job="{{ include "document-processor.fullname" . }}", code=~"5.."}[5m])
+            / rate(http_requests_total{job="{{ include "document-processor.fullname" . }}"}[5m])
+            * 100 > {{ .Values.prometheusRules.errorRateThreshold }}
+          for: {{ .Values.prometheusRules.errorRateDuration }}
+          labels:
+            severity: critical
+          annotations:
+            summary: High error rate on {{ "{{ $labels.instance }}" }}
+            description: Error rate is above {{ .Values.prometheusRules.errorRateThreshold }}% for {{ .Values.prometheusRules.errorRateDuration }}.
+        # NOTE: This alert requires a CloudWatch metrics exporter (e.g. YACE or
+        # prometheus-cloudwatch-exporter) to expose aws_sqs_* metrics in Prometheus.
+        # Without the exporter deployed, this rule is structurally valid but will not fire.
+        - alert: DocumentProcessorQueueDepthHigh
+          expr: |
+            aws_sqs_approximate_number_of_messages_visible{queue_name="{{ include "document-processor.fullname" . }}"}
+            > {{ .Values.prometheusRules.queueDepthThreshold }}
+          for: {{ .Values.prometheusRules.queueDepthDuration }}
+          labels:
+            severity: warning
+          annotations:
+            summary: Queue depth is high on {{ "{{ $labels.queue_name }}" }}
+            description: Queue depth exceeds {{ .Values.prometheusRules.queueDepthThreshold }} for {{ .Values.prometheusRules.queueDepthDuration }}.
+        - alert: DocumentProcessorPodRestarts
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace="{{ .Release.Namespace }}", container="{{ .Chart.Name }}"}[{{ .Values.prometheusRules.podRestartDuration }}])
+            > {{ .Values.prometheusRules.podRestartThreshold }}
+          for: 0s
+          labels:
+            severity: warning
+          annotations:
+            summary: Pod {{ "{{ $labels.pod }}" }} is restarting frequently
+            description: Pod has restarted more than {{ .Values.prometheusRules.podRestartThreshold }} times in {{ .Values.prometheusRules.podRestartDuration }}.
+{{- end }}
